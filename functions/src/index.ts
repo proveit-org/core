@@ -54,8 +54,8 @@ export const prove = functions.https.onRequest(async (request, response) => {
             return response.status(404).send('Item not found. Proof failed.')
         }
 
-        
-        return response.json({hash: getItem.docs[0].data().hash, status: 'pending'})
+
+        return response.json({ hash: getItem.docs[0].data().hash, status: 'pending' })
     }
 
     const txid = getMerkle.docs[0].data().txid
@@ -65,56 +65,81 @@ export const prove = functions.https.onRequest(async (request, response) => {
         return response.status(500).send('Invalid merkle tree')
     }
 
-    const tree = merkle('sha256', false).sync(leaves)
-    const root = tree.root()
-    const path = tree.getProofPath(leaves.indexOf(hash))
+    const tree = buildTree(leaves, leaves.indexOf(hash))
 
-    return response.json({root, path, hash, txid, status: txid ? 'published' : 'processing'})
+    return response.json({ root: tree.root, path: tree.path, hash, txid, status: txid ? 'published' : 'processing' })
 
 });
 
+// Build a tree given hashes as leaves and return the root
+// optionally return path if path index is provided
+function buildTree(leaves:string[], pathIndex?: number) : any {
+    const tree = merkle('sha256', false).sync(leaves)
+    return {root: tree.root(), ...( pathIndex && {path: tree.getProofPath(pathIndex)}) }
+}
+
 // Process item collections and make a merkle tree
-export const mvsWorker = functions.pubsub.schedule('every 5 minutes')
+export const mvsWorker = functions.pubsub.schedule('every 1 minutes')
     .timeZone('America/New_York')
     .onRun(async (context) => {
-        const snapshot = await itemRef.where('refToMerkle', '==', null).get()
-        if (snapshot.empty) {
-            console.log('Nothing to do... return to sleep');
-            return;
+        try {
+
+            // get all pending items that have not been processed and stored into a merkle tree
+            const snapshot = await itemRef.where('refToMerkle', '==', null).get()
+            if (snapshot.empty) {
+                console.log('Nothing to do... return to sleep');
+                return;
+            }
+
+            const hashes: Array<string> = []
+            snapshot.forEach((doc: any) => hashes.push(doc.data().hash))
+
+            const merkleData = {
+                blockchain: 'metaverse',
+                txid: null,
+                leaves: hashes
+            }
+
+            const batch = db.batch();
+            
+            // create a new merkle tree
+            const { id } = await merkleRef.add(merkleData)
+            console.log(`generated new merkle tree with id ${id}`);
+
+            // update item to reference to the merkle tree id
+            hashes.forEach((hash: string) => {
+                batch.update(itemRef.doc(hash), { refToMerkle: id });
+            })
+
+            const utxoCandidates: any[] = [{
+                address: "tLPPUUy7NhW9QQebLyxoJLajQJh1cVuHJx",
+                attachment: { "type": "etp" },
+                index: 1,
+                locked_until: 0,
+                value: 201800000000,
+                hash: "941e6324ce3fbc3bd58ebae52b2a1f197cb15a4263811edbbd284044ae089d45",
+            }] //call explorer
+
+            // publish to metaverse blockchain (register the root hash as a MIT)
+            
+            const wallet = await Metaverse.wallet.fromMnemonic(MNEMONIC, 'testnet')
+
+            const txInput = await Metaverse.output.findUtxo(utxoCandidates, {}, 0)
+            
+            let transaction = await Metaverse.transaction_builder.registerMIT(txInput.utxo, ADDRESS, AVATAR, buildTree(hashes).root, "proveIt", ADDRESS, txInput.change)
+            transaction = await wallet.sign(transaction)
+
+            const pubTx = await blockchain.transaction.broadcast(transaction.encode().toString('hex'))
+
+            console.log('published new transaction', pubTx)
+
+            await merkleRef.doc(id).update({ txid: pubTx.hash })
+
+            batch.commit().catch((err: Error) => console.error(err));
+
         }
-
-        const hashes: Array<string> = []
-        snapshot.forEach((doc: any) => hashes.push(doc.data().hash))
-
-        const merkleData = {
-            blockchain: 'metaverse',
-            txid: null,
-            leaves: hashes
+        catch (error) {
+            console.error(error)
         }
-
-        const { id } = await merkleRef.add(merkleData)
-        console.log(`generated new merkle tree with id ${id}`);
-
-        const utxoCandidates: any[] = [] //call explorer
-
-        const wallet = Metaverse.wallet.fromMnemonic(MNEMONIC, 'testnet')
-
-        const txInput = await Metaverse.output.findUtxo(utxoCandidates, {}, 0)
-
-        let transaction = await Metaverse.transaction_builder.registerMIT(txInput.utxo, ADDRESS, AVATAR, undefined, "proveIt" , wallet.getAddresses()[0], txInput.change)
-
-        transaction = await wallet.sign(transaction)
-
-
-        const batch = db.batch();
-
-        hashes.forEach((hash: string) => {
-            batch.update(itemRef.doc(hash), { refToMerkle: id });
-        })
-        batch.commit().catch((err: Error) => console.error(err));
-
-        const pubTx = await blockchain.transaction.broadcast(transaction.encode().toString('hex'))
-
-        await merkleRef.doc(id).update({ txid: pubTx.hash })
-
     });
+
