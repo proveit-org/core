@@ -1,6 +1,13 @@
 import 'source-map-support/register';
+import { MNEMONIC, AVATAR, ADDRESS } from './config'
 import * as functions from 'firebase-functions';
+
+const blockchain = require('mvs-blockchain')({
+    url: 'https://explorer-testnet.mvs.org/api/'
+});
+
 const merkle = require('merkle');
+const Metaverse = require('metaversejs')
 
 const admin = require('firebase-admin');
 admin.initializeApp(functions.config().firebase);
@@ -44,26 +51,25 @@ export const prove = functions.https.onRequest(async (request, response) => {
 
         // if we also can't find it in the item collectoin
         if (getItem.empty) {
-            response.status(404).send('Item not found. Proof failed.')
+            return response.status(404).send('Item not found. Proof failed.')
         }
 
         
-        response.json({hash: getItem.docs[0].data().hash, status: 'pending'})
+        return response.json({hash: getItem.docs[0].data().hash, status: 'pending'})
     }
 
     const txid = getMerkle.docs[0].data().txid
     const leaves: Array<string> = getMerkle.docs[0].data().leaves
 
     if (!Array.isArray(leaves)) {
-        response.status(500).send('Invalid merkle tree')
+        return response.status(500).send('Invalid merkle tree')
     }
 
     const tree = merkle('sha256', false).sync(leaves)
     const root = tree.root()
     const path = tree.getProofPath(leaves.indexOf(hash))
 
-
-    response.json({root, path, hash, txid, status: txid ? 'published' : 'processing'})
+    return response.json({root, path, hash, txid, status: txid ? 'published' : 'processing'})
 
 });
 
@@ -83,12 +89,22 @@ export const mvsWorker = functions.pubsub.schedule('every 10 minutes')
         const merkleData = {
             blockchain: 'metaverse',
             txid: null,
-            open: true,
             leaves: hashes
         }
 
         const { id } = await merkleRef.add(merkleData)
         console.log(`generated new merkle tree with id ${id}`);
+
+        const utxoCandidates: any[] = [] //call explorer
+
+        const wallet = Metaverse.wallet.fromMnemonic(MNEMONIC, 'testnet')
+
+        const txInput = await Metaverse.output.findUtxo(utxoCandidates, {}, 0)
+
+        let transaction = await Metaverse.transaction_builder.registerMIT(txInput.utxo, ADDRESS, AVATAR, undefined, "proveIt" , wallet.getAddresses()[0], txInput.change)
+
+        transaction = await wallet.sign(transaction)
+
 
         const batch = db.batch();
 
@@ -97,16 +113,33 @@ export const mvsWorker = functions.pubsub.schedule('every 10 minutes')
         })
         batch.commit().catch((err: Error) => console.error(err));
 
+        const pubTx = await blockchain.transaction.broadcast(transaction.encode().toString('hex'))
+
+        await merkleRef.doc(id).update({ txid: pubTx.hash })
+
     });
 
 // Publish merkle trees to the sp@firebase/firestore-typesecified blockchain
 export const publish = functions.pubsub.schedule('every 20 minutes')
     .timeZone('America/New_York')
     .onRun(async (context) => {
+
         const snapshot = await merkleRef.where('txid', '==', null).get()
         if (snapshot.empty) {
             console.log('No unpublished merkle trees.')
             return
         }
+
+
+        await Promise.all(snapshot.map(async (doc: any) => {
+            if (doc.data().blockchain == 'metaverse') {
+                const tree = merkle('sha256', false).sync(doc.data().leaves)
+                const root = tree.root()
+
+                
+                
+
+            }
+        }))
 
     });
