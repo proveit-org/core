@@ -79,6 +79,7 @@ function buildTree(leaves:string[], pathIndex?: number) : any {
 }
 
 // Process item collections and make a merkle tree
+// TODO implement max batch size (500) https://lodash.com/ and loop through
 export const mvsWorker = functions.pubsub.schedule('every 1 minutes')
     .timeZone('America/New_York')
     .onRun(async (context) => {
@@ -111,17 +112,23 @@ export const mvsWorker = functions.pubsub.schedule('every 1 minutes')
                 batch.update(itemRef.doc(hash), { refToMerkle: id });
             })
 
-            const utxoCandidates: any[] = [{
-                address: "tLPPUUy7NhW9QQebLyxoJLajQJh1cVuHJx",
-                attachment: { "type": "etp" },
-                index: 1,
-                locked_until: 0,
-                value: 201800000000,
-                hash: "941e6324ce3fbc3bd58ebae52b2a1f197cb15a4263811edbbd284044ae089d45",
-            }] //call explorer
+            let utxoCandidates = await blockchain.utxo.get([ADDRESS])
+            utxoCandidates = utxoCandidates.map((utxo: any)=>{
+                utxo.hash=utxo.tx
+                utxo.locked_until=0
+                return utxo
+            })
+            // const utxoCandidates: any[] = [{
+            //     address: "tLPPUUy7NhW9QQebLyxoJLajQJh1cVuHJx",
+            //     attachment: { "type": "etp" },
+            //     index: 1,
+            //     locked_until: 0,
+            //     value: 201800000000,
+            //     hash: "941e6324ce3fbc3bd58ebae52b2a1f197cb15a4263811edbbd284044ae089d45",
+            // }] 
 
             // publish to metaverse blockchain (register the root hash as a MIT)
-            
+
             const wallet = await Metaverse.wallet.fromMnemonic(MNEMONIC, 'testnet')
 
             const txInput = await Metaverse.output.findUtxo(utxoCandidates, {}, 0)
@@ -133,7 +140,8 @@ export const mvsWorker = functions.pubsub.schedule('every 1 minutes')
 
             console.log('published new transaction', pubTx)
 
-            await merkleRef.doc(id).update({ txid: pubTx.hash })
+            // await merkleRef.doc(id).update({ txid: pubTx.hash })
+            await batch.update(merkleRef.doc(id), {"txid": pubTx.hash})
 
             batch.commit().catch((err: Error) => console.error(err));
 
