@@ -74,7 +74,7 @@ export const prove = functions.https.onRequest(async (request, response) => {
 });
 
 // Process item collections and make a merkle tree
-export const mvsWorker = functions.pubsub.schedule('every 10 minutes')
+export const mvsWorker = functions.pubsub.schedule('every 5 minutes')
     .timeZone('America/New_York')
     .onRun(async (context) => {
         const snapshot = await itemRef.where('refToMerkle', '==', null).get()
@@ -116,30 +116,5 @@ export const mvsWorker = functions.pubsub.schedule('every 10 minutes')
         const pubTx = await blockchain.transaction.broadcast(transaction.encode().toString('hex'))
 
         await merkleRef.doc(id).update({ txid: pubTx.hash })
-
-    });
-
-// Publish merkle trees to the sp@firebase/firestore-typesecified blockchain
-export const publish = functions.pubsub.schedule('every 20 minutes')
-    .timeZone('America/New_York')
-    .onRun(async (context) => {
-
-        const snapshot = await merkleRef.where('txid', '==', null).get()
-        if (snapshot.empty) {
-            console.log('No unpublished merkle trees.')
-            return
-        }
-
-
-        await Promise.all(snapshot.map(async (doc: any) => {
-            if (doc.data().blockchain == 'metaverse') {
-                const tree = merkle('sha256', false).sync(doc.data().leaves)
-                const root = tree.root()
-
-                
-                
-
-            }
-        }))
 
     });
