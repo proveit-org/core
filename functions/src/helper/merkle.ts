@@ -9,5 +9,5 @@ const merkle = require('merkle')
  */
 export function buildTree(leaves:string[], pathIndex?: number) : any {
     const tree = merkle('sha256', false).sync(leaves)
-    return {root: tree.root(), ...( pathIndex && {path: tree.getProofPath(pathIndex)}) }
+    return {root: tree.root(), ...( pathIndex !==undefined && pathIndex>=0 && {path: tree.getProofPath(pathIndex)}) }
 }

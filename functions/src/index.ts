@@ -16,7 +16,7 @@ export const prove = https.onRequest(proveApp);
 
 // Process item collections and make a merkle tree
 import { work } from './workers/metaverse-testnet';
-export const mvsWorker = pubsub.schedule('every 1 minutes')
+export const mvsWorker = pubsub.schedule('every 3 minutes')
     .timeZone('America/New_York')
     .onRun(work);
 
