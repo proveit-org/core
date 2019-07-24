@@ -1,0 +1,6 @@
+steps:
+- name: 'gcr.io/cloud-builders/npm'
+  args: [ 'install' ]
+  dir: 'functions'
+- name: 'gcr.io/proveit-muffins/firebase'
+  args: [ 'deploy', '-P', 'proveit-muffins', '--token', '${_FIREBASE_TOKEN}']
