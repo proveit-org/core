@@ -1,22 +1,22 @@
 import { Request, Response, } from 'express';
 const express = require("express")
 const bodyParser = require('body-parser')
-// const busyboy = require('connect-busboy')
+// const busboy = require('connect-busboy')
 const cors = require('cors')
-const fileUpload = require('express-fileupload')
+// const fileUpload = require('express-fileupload')
 const fileMiddleware = require('express-multipart-file-parser')
 
 export const storeApp = express()
-// storeApp.use(busyboy())
+// storeApp.use(busboy())
 storeApp.use(fileMiddleware)
 storeApp.use(bodyParser())
 storeApp.use(cors())
-storeApp.use(fileUpload({
-    tempFileDir: "/tmp",
+// storeApp.use(fileUpload({
+    // tempFileDir: "/tmp",
     // limits: { fileSize: 50　* 1024 * 1024 },
     // abortOnLimit: true,
     // safeFileNames: true,
-}))
+// }))
 
 import { firestore, storage } from 'firebase-admin';
 import { ok } from 'assert';
@@ -28,8 +28,8 @@ const itemRef = db.collection('item');
 
 storeApp.post("*", async (request: any, response: Response) => {
     const hash = request.body.hash
-    console.info(request.files)
-    return store(hash, response, request.files.file)
+    const meta = request.body.meta
+    return store(hash, response, meta, request.files ? request.files[0] : undefined)
 })
 
 storeApp.get("*", async (request: Request, response: Response) => {
@@ -37,7 +37,7 @@ storeApp.get("*", async (request: Request, response: Response) => {
     return store(hash, response)
 })
 
-const store = async (hash: string, response: Response, file?: any) => {
+const store = async (hash: string, response: Response, meta?: any, file?: any) => {
 
     try {
 
@@ -50,6 +50,7 @@ const store = async (hash: string, response: Response, file?: any) => {
         //Store new record
         await itemRef.doc(hash).set({
             hash,
+            ...(meta && {meta}),
             hasMetaverseTestnet: null,
             hasMetaverse: null,
             hasBitcoinTestnet: null,
@@ -62,8 +63,9 @@ const store = async (hash: string, response: Response, file?: any) => {
 
         // Optionally store the file in firebase storage using hash as filename
         if (file) {
-            await bucket.upload(file.tempFilePath)
-            await bucket.upload('', {destination: hash + ".pdf"})
+            const bucketFile = bucket.file(hash+'.pdf');
+            await bucketFile.save(file.buffer)
+            // await writeBuffer(hash+'.pdf', file.buffer)
         }
 
         return response.send("SUCCESS")
@@ -79,3 +81,23 @@ const store = async (hash: string, response: Response, file?: any) => {
         return response.send('INTERNAL_ERROR')
     }
 }
+/*
+function writeBuffer(filename: string, buffer: Buffer){
+    return new Promise((resolve, reject)=>{
+            const bucketFile = bucket.file(filename);
+            const stream = bucketFile.createWriteStream({
+                metadata: {
+                    contentType: 'application/pdf'
+                }
+            });
+            stream.on('error', (err: Error) => {
+                console.error(err)
+                throw err.message
+            });
+            stream.on('finish', () => {
+                resolve();
+            });
+            stream.end(buffer);
+    })
+}
+*/
