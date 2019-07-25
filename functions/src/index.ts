@@ -10,9 +10,14 @@ admin.initializeApp(config().firebase);
 // Add to collection
 import { storeApp } from './api/store';
 export const store = https.onRequest(storeApp)
+
 // Retrieve proof 
 import { proveApp } from './api/prove';
 export const prove = https.onRequest(proveApp);
+
+// Download file
+import { downloadApp } from './api/download';
+export const download = https.onRequest(downloadApp);
 
 // Process item collections and make a merkle tree
 import { work } from './workers/metaverse-testnet';

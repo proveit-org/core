@@ -21,7 +21,7 @@ proveApp.get("*", async (request: Request, response: Response) => {
 
         ok(hash, 'HASH_MISSING')
 
-        const hasFile = (await bucket.file(hash + '.pdf').exists())[0]
+        const [hasFile] = (await bucket.file(hash + '.pdf').exists())
 
         // get the merkle tree that contains this has in its array of leaves
         const getMerkle = await merkleRef

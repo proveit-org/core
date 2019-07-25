@@ -20,6 +20,7 @@ storeApp.use(cors())
 
 import { firestore, storage } from 'firebase-admin';
 import { ok } from 'assert';
+import { getFileHash } from '../helper/merkle';
 
 const db = firestore();
 const bucket = storage().bucket();
@@ -28,16 +29,18 @@ const itemRef = db.collection('item');
 
 storeApp.post("*", async (request: any, response: Response) => {
     const hash = request.body.hash
+    const password = request.body.password
     const meta = request.body.meta
-    return store(hash, response, meta, request.files ? request.files[0] : undefined)
+    return store(hash, response, password , meta, request.files ? request.files[0] : undefined)
 })
 
 storeApp.get("*", async (request: Request, response: Response) => {
     const hash = request.query.hash
-    return store(hash, response)
+    const password = request.query.password
+    return store(hash, response, password)
 })
 
-const store = async (hash: string, response: Response, meta?: any, file?: any) => {
+const store = async (hash: string, response: Response, password: string, meta?: any, file?: any) => {
 
     try {
 
@@ -63,7 +66,7 @@ const store = async (hash: string, response: Response, meta?: any, file?: any) =
 
         // Optionally store the file in firebase storage using hash as filename
         if (file) {
-            const bucketFile = bucket.file(hash+'.pdf');
+            const bucketFile = bucket.file(getFileHash(hash,password)+'.pdf');
             await bucketFile.save(file.buffer)
             // await writeBuffer(hash+'.pdf', file.buffer)
         }
