@@ -3,4 +3,4 @@ steps:
   args: [ 'install' ]
   dir: 'functions'
 - name: 'gcr.io/proveit-muffins/firebase'
-  args: [ 'deploy', '-P', 'proveit-muffins', '--token', '${_FIREBASE_TOKEN}']
+  args: [ 'deploy', '-P', 'proveit-muffins', '--only', 'functions', '--token', '${_FIREBASE_TOKEN}']
