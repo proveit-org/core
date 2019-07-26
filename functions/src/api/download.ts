@@ -5,8 +5,9 @@ const cors = require('cors')
 downloadApp.use(cors())
 
 import { getFileHash } from '../helper/merkle'
-import { storage } from 'firebase-admin';
-import { ok } from 'assert';
+import { storage } from 'firebase-admin'
+import { ok } from 'assert'
+import { postSlack } from '../helper/slack'
 
 const bucket = storage().bucket();
 
@@ -23,6 +24,7 @@ downloadApp.get("*", async (request: Request, response: Response) => {
         return file.createReadStream().pipe(response)
     } catch (error) {
         response.status(500)
-        return response.send(error.message)
+        const ts = await postSlack('downloadApp: '+error.message)
+        return response.send({error_msg: error.message, slack_ts: ts})
     }
 })
