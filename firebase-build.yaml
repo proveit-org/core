@@ -1,0 +1,5 @@
+steps:
+- name: 'gcr.io/cloud-builders/docker'
+  args: [ 'build', '-t', 'gcr.io/proveit-muffins/firebase', '.' ]
+images:
+- 'gcr.io/proveit-muffins/firebase'
