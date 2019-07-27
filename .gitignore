@@ -1,3 +1,6 @@
+# Webapp folder should just be a soft link to proveit-org/webapp/dist/proveIt 
+public*
+
 # Logs
 logs
 *.log

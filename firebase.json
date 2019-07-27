@@ -8,31 +8,5 @@
       "npm --prefix \"$RESOURCE_DIR\" run lint",
       "npm --prefix \"$RESOURCE_DIR\" run build"
     ]
-  },
-  "hosting": {
-    "public": "public",
-    "ignore": [
-      "firebase.json",
-      "**/.*",
-      "**/node_modules/**"
-    ],
-    "rewrites": [
-      {
-        "source": "/api/prove",
-        "function": "prove"
-      },
-      {
-        "source": "/api/store",
-        "function": "store"
-      },
-      {
-        "source": "/api/download",
-        "function": "download"
-      },
-      {
-        "source": "**",
-        "destination": "/index.html"
-      }
-    ]
   }
 }

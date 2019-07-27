@@ -28,13 +28,13 @@ admin.initializeApp(config().firebase);
 const functions = require('firebase-functions')
 
 import { storeApp } from './api/store';
-exports.store = functions.region('asia-northeast1').https.onRequest(storeApp);
+exports.store = functions.region('us-central1').https.onRequest(storeApp);
 
 import { proveApp } from './api/prove';
-exports.prove = functions.region('asia-northeast1').https.onRequest(proveApp);
+exports.prove = functions.region('us-central1').https.onRequest(proveApp);
 
 import { downloadApp } from './api/download';
-exports.download = functions.region('asia-northeast1').https.onRequest(downloadApp);
+exports.download = functions.region('us-central1').https.onRequest(downloadApp);
 
 import { work } from './workers/metaverse-testnet';
-exports.mvsWorker = functions.region('asia-northeast1').pubsub.schedule('every 3 minutes').timeZone('America/New_York').onRun(work);
+exports.mvsWorker = functions.region('us-central1').pubsub.schedule('every 3 minutes').timeZone('America/New_York').onRun(work);
