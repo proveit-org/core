@@ -6,7 +6,7 @@ proveApp.use(cors())
 
 import { firestore, storage } from 'firebase-admin';
 import { ok } from 'assert';
-import { buildTree } from '../helper/merkle';
+import { buildTree, getFileHash } from '../helper/merkle';
 
 const db = firestore();
 
@@ -17,6 +17,7 @@ const bucket = storage().bucket();
 
 proveApp.get("*", async (request: Request, response: Response) => {
     const hash = request.query.hash
+    const password = request.query.password
     try {
 
         ok(hash, 'HASH_MISSING')
@@ -37,36 +38,45 @@ proveApp.get("*", async (request: Request, response: Response) => {
             return response.status(404).send('Item not found. Proof failed.')
         }
 
-        // if we don't find it in any merkle tree, check the item collection 
-        if (getMerkle.empty) {
+        const storedPasswordHash = getItem.docs[0].data().password 
+        let hasPassword = false
+        let passwordHash = null
+        let proofs = null
+        let meta = getItem.docs[0].data().meta 
+        let status = 'pending'
+        
+        // if the item is password protected
+        if (storedPasswordHash) {
+            hasPassword = true
+            passwordHash = getFileHash(hash, password)
+            if (passwordHash !== storedPasswordHash) meta = null
+        }
 
-            return response.json({
-                hash: getItem.docs[0].data().hash,
-                meta: getItem.docs[0].data().meta,
-                hasFile,
-                status: 'pending',
+        // if it's in the merkle tree 
+        if (!getMerkle.empty) {
+            status = 'published'
+            proofs = getMerkle.docs.map((merkle) => {
+                const txid = merkle.data().txid
+                const leaves: Array<string> = merkle.data().leaves
+                if (!Array.isArray(leaves)) throw Error('INVALID_MERKLE_TREE')
+                const tree = buildTree(leaves, leaves.indexOf(hash))
+                return {
+                    blockchain: merkle.data().blockchain,
+                    txid,
+                    path: tree.path,
+                    root: tree.root,
+                }
             })
         }
 
-        const proofs = getMerkle.docs.map((merkle) => {
-            const txid = merkle.data().txid
-            const leaves: Array<string> = merkle.data().leaves
-            if (!Array.isArray(leaves)) throw Error('INVALID_MERKLE_TREE')
-            const tree = buildTree(leaves, leaves.indexOf(hash))
-            return {
-                blockchain: merkle.data().blockchain,
-                txid,
-                path: tree.path,
-                root: tree.root,
-            }
-        })
-
+        // only return the meta data if password provided match what we have in the collection 
         return response.json({
             hash,
             proofs,
-            meta: getItem.docs[0].data().meta,
+            meta,
+            hasPassword,
             hasFile,
-            status: 'published',
+            status,
         })
 
     } catch (error) {

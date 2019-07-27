@@ -45,7 +45,9 @@ const store = async (hash: string, response: Response, password: string, meta?: 
     try {
 
         ok(hash, 'HASH_MISSING')
-    
+        
+        const passwordHash = getFileHash(hash, password)
+   
         //Check if record already exists
         const getItem = await itemRef.doc(hash).get()
         if (getItem.exists) throw Error('DUPLICATE_ENTRY')
@@ -58,6 +60,7 @@ const store = async (hash: string, response: Response, password: string, meta?: 
             hasMetaverse: null,
             hasBitcoinTestnet: null,
             hasBitcoin: null,
+            password: password ? passwordHash : null,
             created: firestore.Timestamp.now().seconds
         }).catch(error => {
             console.error(error)
@@ -66,7 +69,7 @@ const store = async (hash: string, response: Response, password: string, meta?: 
 
         // Optionally store the file in firebase storage using hash as filename
         if (file) {
-            const bucketFile = bucket.file(getFileHash(hash,password)+'.pdf');
+            const bucketFile = bucket.file(hash+'.pdf');
             await bucketFile.save(file.buffer)
             // await writeBuffer(hash+'.pdf', file.buffer)
         }
