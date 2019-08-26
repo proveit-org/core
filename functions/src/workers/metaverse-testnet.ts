@@ -1,5 +1,7 @@
-import { MNEMONIC, AVATAR, ADDRESS } from '../config'
+import { MNEMONIC, AVATAR, ADDRESS, SLACK } from '../config'
 import { buildTree } from '../helper/merkle';
+const Slack = require('slack')
+const bot = new Slack(SLACK)
 
 const blockchain = require('mvs-blockchain')({
     url: 'https://explorer-testnet.mvs.org/api/'
@@ -74,10 +76,21 @@ export const work = async (context: EventContext) => {
 
                 await t.update(merkleRef.doc(reference.id), { txid: pubTx.hash })
 
+
+                try {
+                    await bot.chat.postMessage({
+                        channel: 'notifications',
+                        text: `created new metaverse testnet transaction ${pubTx.hash} for merkle tree ${reference.id} with ${merkleData.leaves.length} documents`,
+                        icon_emoji: ':white_check_mark:'
+                    })
+                } catch (error) {
+                    console.error(error)
+                }
+
                 //set new utxo for next merkle
                 const newUtxo = {
                     address: ADDRESS,
-                    attachment: { type: 'etp'},
+                    attachment: { type: 'etp' },
                     value: transaction.outputs[transaction.outputs.length - 1].value,
                     hash: pubTx.hash,
                     index: transaction.outputs.length - 1,
@@ -91,5 +104,14 @@ export const work = async (context: EventContext) => {
     }
     catch (error) {
         console.error(error)
+        await bot.chat.postMessage({
+            channel: 'notifications',
+            text: 'error newsletter signup',
+            blocks: [
+                { "type": "section", "text": { "type": "plain_text", "text": "Error signing up user to newsletter" } },
+                { "type": "section", "text": { "type": "plain_text", "text": error.message } }
+            ],
+            icon_emoji: ':warning:'
+        })
     }
 }

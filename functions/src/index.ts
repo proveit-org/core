@@ -36,5 +36,8 @@ exports.prove = functions.region('us-central1').https.onRequest(proveApp);
 import { downloadApp } from './api/download';
 exports.download = functions.region('us-central1').https.onRequest(downloadApp);
 
+import { signupApp } from './api/signup';
+exports.signup = functions.region('us-central1').https.onRequest(signupApp);
+
 import { work } from './workers/metaverse-testnet';
 exports.mvsWorker = functions.region('us-central1').pubsub.schedule('every 3 minutes').timeZone('America/New_York').onRun(work);
